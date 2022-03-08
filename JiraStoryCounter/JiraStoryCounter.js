@@ -7,6 +7,7 @@
 // @match        https://*/jira/*
 // @icon         https://raw.githubusercontent.com/RayWangQvQ/Ray.Tampermonkey/main/JiraStoryCounter/jira-software_logo.png
 // @grant        none
+// @license      MIT
 // ==/UserScript==
 
 (function() {
