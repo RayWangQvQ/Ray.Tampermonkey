@@ -2,7 +2,7 @@
 // @name         Jira story counter
 // @namespace    https://github.com/RayWangQvQ/Ray.Tampermonkey/
 // @version      0.1
-// @description  try to take over the world!
+// @description  Auto count sub-task stoty point
 // @author       Ray
 // @match        https://*/jira/*
 // @icon         https://raw.githubusercontent.com/RayWangQvQ/Ray.Tampermonkey/main/JiraStoryCounter/jira-software_logo.png
