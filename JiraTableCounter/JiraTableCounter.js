@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        JIRA Table Counter
+// @name        Jira Table Counter
 // @namespace   https://github.com/RayWangQvQ/Ray.Tampermonkey/
 // @description Displays the total amount of table columns
 // @include     https://*jira*
