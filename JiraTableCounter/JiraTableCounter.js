@@ -4,6 +4,7 @@
 // @description Displays the total amount of table columns
 // @include     https://*jira*
 // @author      Ray
+// @supportURL  https://github.com/RayWangQvQ/Ray.Tampermonkey/blob/main/JiraTableCounter/README.md
 // @require     http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js
 // @require     https://greasyfork.org/scripts/383527-wait-for-key-elements/code/Wait_for_key_elements.js?version=701631
 // @version     0.0.1
