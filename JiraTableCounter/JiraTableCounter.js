@@ -21,27 +21,24 @@ waitForKeyElements('#issue-table', getNumPoints);
 function getNumPoints(jNode) {
     var columns = {};
 
+    // init header and set value = 0
     var columnHeaders = jNode.find('.rowHeader');
     columnHeaders.each(function () {
         $(this).children('th').each(function () {
             var id = $(this).attr('data-id');
             columns[id] = 0;
-            //$(this).children('span').append(' (' + columns[id] + ')');
         });
     });
 
+    // count
     var rows = jNode.find('.issuerow');
     rows.each(function () {
         var row = $(this);
         var tds = row.children('td');
         tds.each(function () {
             var td = $(this);
-
             var columnId = td.attr('class');
-            console.log(columnId);
-
             var point = parseInt(td.html(), 10)
-            console.log(point);
 
             if (point > 0) {
                 columns[columnId] += point;
@@ -49,6 +46,7 @@ function getNumPoints(jNode) {
         })
     });
 
+    // append sum num to header
     columnHeaders.each(function () {
         $(this).children('th').each(function () {
             var id = $(this).attr('data-id');
@@ -58,7 +56,4 @@ function getNumPoints(jNode) {
             }
         });
     });
-
-
-    console.log(columns);
 }
