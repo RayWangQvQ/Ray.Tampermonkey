@@ -5,7 +5,7 @@
 // @include     https://*jira*
 // @author      Ray
 // @require     http://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js
-// @require     https://gist.github.com/raw/2625891/waitForKeyElements.js
+// @require     https://greasyfork.org/scripts/383527-wait-for-key-elements/code/Wait_for_key_elements.js?version=701631
 // @version     0.0.1
 // @icon        https://raw.githubusercontent.com/RayWangQvQ/Ray.Tampermonkey/main/JiraStoryCounter/jira-software_logo.png
 // @grant       none
@@ -15,7 +15,7 @@
 this.$ = this.jQuery = jQuery.noConflict(true);
 
 waitForKeyElements('.issue-table', getNumPoints);
-waitForKeyElements('#issue-table', getNumPoints);
+waitForKeyElements('#issuetable', getNumPoints);
 
 // jNode is the table
 function getNumPoints(jNode) {
@@ -38,7 +38,7 @@ function getNumPoints(jNode) {
         tds.each(function () {
             var td = $(this);
             var columnId = td.attr('class');
-            var point = parseInt(td.html(), 10)
+            var point = parseFloat(td.context.innerText || 0);
 
             if (point > 0) {
                 columns[columnId] += point;
