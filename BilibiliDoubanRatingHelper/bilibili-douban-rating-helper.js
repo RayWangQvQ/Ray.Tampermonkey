@@ -2,7 +2,7 @@
 // @name         Bilibili 豆瓣评分助手
 // @name:en      Bilibili Douban Rating Helper
 // @namespace    https://github.com/RayWangQvQ/Ray.Tampermonkey/
-// @version      0.2.4
+// @version      0.2.6
 // @description  为 Bilibili 电影页面补充显示豆瓣评分，支持详情页、列表页封面角标和侧边列表评分展示。
 // @description:en  Add Douban ratings to Bilibili movie pages, including detail pages, list cover badges, and side-list score display.
 // @author       Ray
@@ -12,7 +12,7 @@
 // @match        *://www.bilibili.com/bangumi/play/*
 // @match        *://search.bilibili.com/bangumi*
 // @match        *://search.bilibili.com/pgc*
-// @icon         https://github.com/RayWangQvQ/Ray.Tampermonkey/BilibiliDoubanRatingHelper/icon.png
+// @icon         https://raw.githubusercontent.com/RayWangQvQ/Ray.Tampermonkey/refs/heads/main/BilibiliDoubanRatingHelper/icon.svg
 // @connect      www.douban.com
 // @connect      movie.douban.com
 // @connect      douban.com
