@@ -20,7 +20,7 @@
 
 ## 安装方式
 
-1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/)。
+1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/) 或 [scriptcat](https://github.com/scriptscat/scriptcat)。。
 2. 新建一个用户脚本。
 3. 复制 `JiraStoryCounter.js` 的内容并保存。
 4. 打开 Jira 列表页面确认表头统计是否显示。

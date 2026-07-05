@@ -35,7 +35,7 @@
 
 ## 安装方式
 
-1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/)。
+1. 安装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/) 或 [scriptcat](https://github.com/scriptscat/scriptcat)。。
 2. 新建一个用户脚本。
 3. 复制 `bilibili-douban-rating-helper.js` 的内容并保存。
 4. 打开支持的 Bilibili 页面进行验证。
