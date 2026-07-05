@@ -2,6 +2,8 @@
 
 为 Bilibili 影视相关页面补充展示豆瓣评分，支持详情页、列表页封面角标、侧边列表以及搜索结果中的高置信度官方影视条目。
 
+![MovieList](https://github.com/RayWangQvQ/Ray.Tampermonkey/BilibiliDoubanRatingHelper/MovieList.png)
+
 ## 功能
 
 - 在 Bilibili 番剧 / 电影详情页展示豆瓣评分。

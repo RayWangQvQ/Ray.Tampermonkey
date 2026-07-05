@@ -12,7 +12,7 @@
 // @match        *://www.bilibili.com/bangumi/play/*
 // @match        *://search.bilibili.com/bangumi*
 // @match        *://search.bilibili.com/pgc*
-// @icon         https://www.bilibili.com/favicon.ico
+// @icon         https://github.com/RayWangQvQ/Ray.Tampermonkey/BilibiliDoubanRatingHelper/icon.png
 // @connect      www.douban.com
 // @connect      movie.douban.com
 // @connect      douban.com
