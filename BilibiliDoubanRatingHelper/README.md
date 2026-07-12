@@ -1,6 +1,6 @@
 # BilibiliDoubanRatingHelper
 
-为 Bilibili 影视相关页面补充展示豆瓣评分，支持详情页、列表页封面角标、侧边列表以及搜索结果中的高置信度官方影视条目。
+为 Bilibili 影视相关页面补充展示豆瓣评分，支持详情页、列表页封面角标、排行榜以及搜索结果中的高置信度官方影视条目。
 
 ![MovieList](https://raw.githubusercontent.com/RayWangQvQ/Ray.Tampermonkey/refs/heads/main/BilibiliDoubanRatingHelper/MovieList.png)
 
@@ -8,12 +8,13 @@
 
 - 在 Bilibili 番剧 / 电影详情页展示豆瓣评分。
 - 在影视列表页卡片上补充评分角标。
-- 在侧边推荐区域展示评分信息。
+- 在电影排行榜页卡片上补充评分角标。
 - 在搜索结果中，仅对高置信度官方影视结果补充评分。
 
 ## 支持页面
 
 - `https://www.bilibili.com/movie*`
+- `https://www.bilibili.com/v/popular/rank/movie*`
 - `https://www.bilibili.com/bangumi/play/*`
 - `https://search.bilibili.com/bangumi*`
 - `https://search.bilibili.com/pgc*`

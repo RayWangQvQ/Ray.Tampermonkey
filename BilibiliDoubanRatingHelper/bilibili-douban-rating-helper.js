@@ -2,13 +2,14 @@
 // @name         Bilibili 豆瓣评分助手
 // @name:en      Bilibili Douban Rating Helper
 // @namespace    https://github.com/RayWangQvQ/Ray.Tampermonkey/
-// @version      0.2.6
-// @description  为 Bilibili 电影页面补充显示豆瓣评分，支持详情页、列表页封面角标和侧边列表评分展示。
-// @description:en  Add Douban ratings to Bilibili movie pages, including detail pages, list cover badges, and side-list score display.
+// @version      0.2.8
+// @description  为 Bilibili 电影页面补充显示豆瓣评分，支持详情页、列表页封面角标、排行榜和搜索结果评分展示。
+// @description:en  Add Douban ratings to Bilibili movie pages, including detail pages, list cover badges, ranking pages, and search result score display.
 // @author       Ray
 // @homepageURL  https://github.com/RayWangQvQ/Ray.Tampermonkey/
 // @supportURL   https://github.com/RayWangQvQ/Ray.Tampermonkey/
 // @match        *://www.bilibili.com/movie*
+// @match        *://www.bilibili.com/v/popular/rank/movie*
 // @match        *://www.bilibili.com/bangumi/play/*
 // @match        *://search.bilibili.com/bangumi*
 // @match        *://search.bilibili.com/pgc*
@@ -36,7 +37,6 @@
     requestIntervalMs: 1300,
     requestTimeoutMs: 15000,
     maxListItemsPerScan: 120,
-    maxSideItemsPerScan: 30,
     listObserverDebounceMs: 800,
     listRootMargin: '700px',
   };
@@ -49,8 +49,6 @@
   const BAD_TEXT_RE = /^(?:播放数量|更新时间|上映时间|最高评分|全部|观看正片|TOP100|追剧|点评|查看全部|正在加载|更多|更多推荐|电影|大会员|独播|热播|即将上线|筛选|地区|风格|年份|付费|热搜|排行榜|榜单|换一换)$/;
   const SCORE_ONLY_RE = /^(?:\d(?:\.\d)?|\d{1,2}\.\d|--|暂无评分|\d+万?|\d+人看过)$/;
   const BAD_LINE_RE = /(?:播放|弹幕|追剧|更新|上映|豆瓣|评分|排行榜|热搜|人看过|万播放|全部|筛选|地区|风格|年份)/;
-  const SIDE_LIST_CLASS_RE = /(?:side[-_]?list|sideList|SideList|side-list|side_list)/i;
-  const SIDE_IMAGE_CLASS_RE = /(?:^|\s|_|-)(?:img|bg[-_]?item|bg_item|bgItem)(?:\s|_|-|$)/i;
   const SEARCH_MEDIA_LABEL_RE = /(?:^|\s)(电影|番剧|国创)(?:\s|$)/;
   const SEARCH_POSITIVE_META_RE = /(?:立即观看|全片|全\d+话|\d+人评分|出演:|声优:|简介:|查看全部\s*\d+\s*部相关影视作品)/;
   const SEARCH_NEGATIVE_META_RE = /(?:^|\s)(?:UP主|投稿|播放|弹幕|收藏|硬币|点赞|分P|合集|稿件)(?:\s|$)/;
@@ -64,10 +62,8 @@
 
   let preparedAnchors = new WeakSet();
   let preparedCardRoots = new WeakSet();
-  let preparedSideAnchors = new WeakSet();
   let preparedSearchRoots = new WeakSet();
   let pendingListInfo = new WeakMap();
-  let pendingSideInfo = new WeakMap();
   let pendingSearchInfo = new WeakMap();
   let cardBadgeMap = new WeakMap();
 
@@ -102,7 +98,10 @@
 
   function isBiliMovieListPage() {
     return location.hostname === 'www.bilibili.com' &&
-      /^\/movie(?:\/|$|\?|#)/.test(location.pathname + location.search + location.hash);
+      (
+        /^\/movie(?:\/|$|\?|#)/.test(location.pathname + location.search + location.hash) ||
+        /^\/v\/popular\/rank\/movie(?:\/|$|\?|#)?/.test(location.pathname + location.search + location.hash)
+      );
   }
 
   function isBiliSearchPage() {
@@ -221,13 +220,10 @@
           intersectionObserver.unobserve(anchor);
 
           const normalInfo = pendingListInfo.get(anchor);
-          const sideInfo = pendingSideInfo.get(anchor);
           const searchInfo = pendingSearchInfo.get(anchor);
 
           if (normalInfo) {
             enqueue(() => fillListRating(normalInfo));
-          } else if (sideInfo) {
-            enqueue(() => fillSideListRating(sideInfo));
           } else if (searchInfo) {
             enqueue(() => fillSearchResultRating(searchInfo));
           }
@@ -283,11 +279,6 @@
   function scanListPage() {
     if (!isBiliMovieListPage()) return;
 
-    /**
-     * 先扫顶部 side-list。
-     * side-list 现在只在电影名下面显示评分，不再做复杂图片定位。
-     */
-    scanTopSideListMovieItems();
     scanNormalCoverMovieCards();
     scheduleBadgePositionUpdate();
   }
@@ -299,8 +290,6 @@
     for (const anchor of anchors) {
       if (preparedCount >= CONFIG.maxListItemsPerScan) break;
       if (preparedAnchors.has(anchor)) continue;
-      if (preparedSideAnchors.has(anchor)) continue;
-      if (isTopSideListAreaAnchor(anchor)) continue;
       if (!isVisibleEnough(anchor)) continue;
 
       /**
@@ -346,63 +335,6 @@
     }
   }
 
-  function scanTopSideListMovieItems() {
-    const anchors = Array.from(document.querySelectorAll(PLAY_LINK_SELECTOR));
-    let preparedCount = 0;
-
-    for (const anchor of anchors) {
-      if (preparedCount >= CONFIG.maxSideItemsPerScan) break;
-      if (preparedSideAnchors.has(anchor)) continue;
-      if (preparedAnchors.has(anchor)) continue;
-      if (!isVisibleEnough(anchor)) continue;
-      if (!isLikelyTopSideListAnchor(anchor)) continue;
-
-      const sideRoot = findSideListRoot(anchor);
-      const itemRoot = anchor.closest('li') || anchor;
-
-      /**
-       * 避免同一个 li 里既有图片链接又有标题链接时重复插入评分。
-       */
-      if (itemRoot.dataset.biliDoubanSidePrepared === '1') {
-        preparedSideAnchors.add(anchor);
-        continue;
-      }
-
-      const title = extractSideListTitle(anchor, itemRoot);
-
-      if (!title) continue;
-
-      preparedSideAnchors.add(anchor);
-      itemRoot.dataset.biliDoubanSidePrepared = '1';
-
-      const info = {
-        kind: 'top-side-list',
-        anchor,
-        sideRoot,
-        itemRoot,
-        title,
-        year: extractYearFromCard(itemRoot) || extractYearFromCard(sideRoot),
-        data: null,
-      };
-
-      pendingSideInfo.set(anchor, info);
-
-      /**
-       * 简单显示：先在电影名下面放一个“豆瓣 …”。
-       * 查询完成后再更新成具体评分。
-       */
-      ensureSideListInlineBadge(anchor, itemRoot).textContent = '豆瓣 …';
-
-      if (intersectionObserver) {
-        intersectionObserver.observe(anchor);
-      } else {
-        enqueue(() => fillSideListRating(info));
-      }
-
-      preparedCount += 1;
-    }
-  }
-
   async function fillListRating(info) {
     const { anchor, cardRoot, coverMedia, title, year } = info;
 
@@ -424,31 +356,6 @@
     } catch (err) {
       updateBadge(badge, fallbackData(title, err), title);
       cardRoot.dataset.biliDoubanDone = '1';
-    }
-  }
-
-  async function fillSideListRating(info) {
-    const { anchor, itemRoot, title, year } = info;
-
-    if (!document.contains(anchor)) return;
-    if (!document.contains(itemRoot)) return;
-    if (itemRoot.dataset.biliDoubanSideDone === '1') return;
-
-    const badge = ensureSideListInlineBadge(anchor, itemRoot);
-
-    badge.textContent = '豆瓣 …';
-    badge.title = `正在查询：${title}`;
-
-    try {
-      const data = await getDoubanRating(title, year);
-      info.data = data;
-      updateSideListInlineBadge(badge, data, title);
-      itemRoot.dataset.biliDoubanSideDone = '1';
-    } catch (err) {
-      const data = fallbackData(title, err);
-      info.data = data;
-      updateSideListInlineBadge(badge, data, title);
-      itemRoot.dataset.biliDoubanSideDone = '1';
     }
   }
 
@@ -512,43 +419,6 @@
     });
 
     positionFloatingBadge(badge, coverMedia);
-
-    return badge;
-  }
-
-  function ensureSideListInlineBadge(anchor, itemRoot = null) {
-    const root = itemRoot || anchor.closest('li') || anchor;
-
-    let badge = root.querySelector('.bili-douban-side-rating');
-
-    if (badge) return badge;
-
-    badge = document.createElement('span');
-    badge.className = 'bili-douban-side-rating';
-    badge.textContent = '豆瓣 …';
-
-    badge.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const url = badge.dataset.url;
-
-      if (url) {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      }
-    }, true);
-
-    /**
-     * 尽量挂到电影名元素下面。
-     * 找不到明确标题元素时，就挂到 li / anchor 里。
-     */
-    const titleHost = findSideListTitleHost(anchor, root);
-
-    if (titleHost && document.contains(titleHost)) {
-      titleHost.appendChild(badge);
-    } else {
-      root.appendChild(badge);
-    }
 
     return badge;
   }
@@ -619,84 +489,8 @@
     if (title) score += 30;
     if (/title|Title|name|Name/.test(cls)) score += 80;
     if (el.matches && /\/bangumi\/play\//.test(el.getAttribute('href') || '')) score += 40;
-    if (SIDE_IMAGE_CLASS_RE.test(cls)) score -= 120;
 
     return score;
-  }
-
-  function findSideListTitleHost(anchor, itemRoot) {
-    const root = itemRoot || anchor.closest('li') || anchor;
-
-    const candidates = [
-      anchor,
-      ...Array.from(root.querySelectorAll([
-        PLAY_LINK_SELECTOR,
-        '[title]',
-        '[aria-label]',
-        '[class*="title"]',
-        '[class*="Title"]',
-        '[class*="name"]',
-        '[class*="Name"]',
-      ].join(','))),
-    ].filter(Boolean);
-
-    const usable = candidates
-      .filter(el => isElement(el))
-      .filter(el => !el.classList.contains('bili-douban-side-rating'))
-      .filter(el => !el.classList.contains('bili-douban-list-rating'))
-      .filter(el => {
-        const cls = String(el.className || '');
-        const text = normalizeSpace(el.innerText || el.textContent || el.getAttribute('title') || el.getAttribute('aria-label') || '');
-
-        /**
-         * 避免把评分挂到纯图片链接 / bg-item 上。
-         */
-        if (SIDE_IMAGE_CLASS_RE.test(cls) && !normalizeSpace(el.innerText || el.textContent)) {
-          return false;
-        }
-
-        return isGoodMovieTitle(findFirstUsableTitleInText(text));
-      });
-
-    if (!usable.length) {
-      return anchor;
-    }
-
-    usable.sort((a, b) => scoreSideListTitleHost(b) - scoreSideListTitleHost(a));
-
-    return usable[0];
-  }
-
-  function scoreSideListTitleHost(el) {
-    const cls = String(el.className || '');
-    const text = normalizeSpace(el.innerText || el.textContent || '');
-    const title = normalizeSpace(el.getAttribute('title') || el.getAttribute('aria-label') || '');
-
-    let score = 0;
-
-    if (text) score += 100;
-    if (title) score += 40;
-    if (/title|Title|name|Name/.test(cls)) score += 80;
-    if (el.matches && el.matches(PLAY_LINK_SELECTOR)) score += 30;
-
-    /**
-     * 图片 / 背景图元素不适合作为“电影名下面”的挂载点。
-     */
-    if (SIDE_IMAGE_CLASS_RE.test(cls)) {
-      score -= 120;
-    }
-
-    return score;
-  }
-
-  function updateSideListInlineBadge(badge, data, title) {
-    badge.classList.toggle('error', data.error === true);
-    badge.textContent = `豆瓣 ${formatRating(data.rating)}`;
-    badge.dataset.url = data.url || searchUrl(title);
-
-    badge.title = data.error
-      ? `未取到评分，点击去豆瓣搜索：${title}`
-      : `豆瓣：${data.subjectTitle || title}`;
   }
 
   function updateSearchInlineBadge(badge, data, title) {
@@ -775,11 +569,6 @@
 
     floatingBadgeRecords.clear();
 
-    /**
-     * side-list 评分不是浮层，而是插在文字下面。
-     * SPA 跳转时也顺手清理掉。
-     */
-    document.querySelectorAll('.bili-douban-side-rating').forEach(el => el.remove());
     document.querySelectorAll('.bili-douban-search-rating').forEach(el => el.remove());
   }
 
@@ -1208,45 +997,6 @@
     return best;
   }
 
-  function isTopSideListAreaAnchor(anchor) {
-    const rect = anchor.getBoundingClientRect();
-
-    if (rect.top > Math.max(window.innerHeight * 1.15, 950)) return false;
-    if (!anchor.closest('li')) return false;
-    if (!anchor.closest('ul')) return false;
-
-    return SIDE_LIST_CLASS_RE.test(getClassPath(anchor, 8));
-  }
-
-  function isLikelyTopSideListAnchor(anchor) {
-    if (!isTopSideListAreaAnchor(anchor)) return false;
-
-    const itemRoot = anchor.closest('li') || anchor;
-    const title = extractSideListTitle(anchor, itemRoot);
-
-    if (!isGoodMovieTitle(title)) return false;
-
-    return true;
-  }
-
-  function findSideListRoot(anchor) {
-    const explicit = anchor.closest(
-      '[class*="side-list"], [class*="sideList"], [class*="SideList"], [class*="side_list"]'
-    );
-
-    if (explicit) {
-      return explicit;
-    }
-
-    const ul = anchor.closest('ul');
-
-    if (ul && ul.querySelectorAll(PLAY_LINK_SELECTOR).length >= 2) {
-      return ul;
-    }
-
-    return anchor.closest('li') || anchor.parentElement || anchor;
-  }
-
   function extractListTitle(anchor, cardRoot) {
     const values = [];
 
@@ -1286,60 +1036,6 @@
 
     return findFirstUsableTitleInText(values.join('\n'));
   }
-
-  function extractSideListTitle(anchor, itemRoot = null) {
-    const root = itemRoot || anchor.closest('li') || anchor;
-    const values = [];
-
-    const add = value => {
-      const text = normalizeSpace(value);
-
-      if (text) {
-        values.push(text);
-      }
-    };
-
-    add(anchor.getAttribute('title'));
-    add(anchor.getAttribute('aria-label'));
-    add(anchor.innerText);
-    add(anchor.textContent);
-
-    if (root && root !== anchor) {
-      add(root.getAttribute('title'));
-      add(root.getAttribute('aria-label'));
-
-      const titleLikeSelector = [
-        '[title]',
-        '[aria-label]',
-        '[class*="title"]',
-        '[class*="Title"]',
-        '[class*="name"]',
-        '[class*="Name"]',
-      ].join(',');
-
-      const titleLikeEls = Array.from(root.querySelectorAll(titleLikeSelector)).slice(0, 20);
-
-      for (const el of titleLikeEls) {
-        if (el.classList && (
-          el.classList.contains('bili-douban-list-rating') ||
-          el.classList.contains('bili-douban-side-rating')
-        )) {
-          continue;
-        }
-
-        add(el.getAttribute('title'));
-        add(el.getAttribute('aria-label'));
-        add(el.innerText);
-        add(el.textContent);
-      }
-
-      add(root.innerText);
-      add(root.textContent);
-    }
-
-    return findFirstUsableTitleInText(values.join('\n'));
-  }
-
   function findFirstUsableTitleInText(text) {
     const raw = normalizeSpace(text);
 
@@ -1771,10 +1467,8 @@
 
         preparedAnchors = new WeakSet();
         preparedCardRoots = new WeakSet();
-        preparedSideAnchors = new WeakSet();
         preparedSearchRoots = new WeakSet();
         pendingListInfo = new WeakMap();
-        pendingSideInfo = new WeakMap();
         pendingSearchInfo = new WeakMap();
         cardBadgeMap = new WeakMap();
 
@@ -2028,37 +1722,6 @@
 
       .bili-douban-list-rating.error:hover {
         background: rgba(100, 100, 100, 0.94);
-      }
-
-      .bili-douban-side-rating {
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: fit-content;
-        min-width: 50px;
-        height: 20px;
-        margin-top: 4px;
-        margin-left: 0;
-        padding: 0 6px;
-        border-radius: 999px;
-        user-select: none;
-        cursor: pointer;
-        white-space: nowrap;
-        font-weight: 700;
-        font-size: 12px;
-        line-height: 1;
-        color: #fff;
-        background: rgba(0, 166, 90, 0.94);
-        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
-      }
-
-      .bili-douban-side-rating:hover {
-        background: rgba(0, 150, 82, 0.98);
-      }
-
-      .bili-douban-side-rating.error {
-        background: rgba(120, 120, 120, 0.88);
       }
 
       .bili-douban-search-rating {
