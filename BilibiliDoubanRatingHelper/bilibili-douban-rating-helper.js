@@ -2,7 +2,7 @@
 // @name         Bilibili 豆瓣评分助手
 // @name:en      Bilibili Douban Rating Helper
 // @namespace    https://github.com/RayWangQvQ/Ray.Tampermonkey/
-// @version      0.2.8
+// @version      0.2.9
 // @description  为 Bilibili 电影页面补充显示豆瓣评分，支持详情页、列表页封面角标、排行榜和搜索结果评分展示。
 // @description:en  Add Douban ratings to Bilibili movie pages, including detail pages, list cover badges, ranking pages, and search result score display.
 // @author       Ray
@@ -350,12 +350,15 @@
     positionFloatingBadge(badge, coverMedia);
 
     try {
-      const data = await getDoubanRating(title, year);
+      const result = await getDoubanRatingWithMeta(title, year);
+      const data = result.data;
       updateBadge(badge, data, title);
       cardRoot.dataset.biliDoubanDone = '1';
+      return !result.fromCache;
     } catch (err) {
       updateBadge(badge, fallbackData(title, err), title);
       cardRoot.dataset.biliDoubanDone = '1';
+      return false;
     }
   }
 
@@ -374,12 +377,15 @@
       const mediaMeta = await getBiliMediaMeta(primaryLink, title, year);
       const finalTitle = mediaMeta.title || title;
       const finalYear = mediaMeta.year || year;
-      const data = await getDoubanRating(finalTitle, finalYear, mediaMeta);
+      const result = await getDoubanRatingWithMeta(finalTitle, finalYear, mediaMeta);
+      const data = result.data;
       updateSearchInlineBadge(badge, data, finalTitle);
       root.dataset.biliDoubanSearchDone = '1';
+      return !result.fromCache;
     } catch (err) {
       updateSearchInlineBadge(badge, fallbackData(title, err), title);
       root.dataset.biliDoubanSearchDone = '1';
+      return false;
     }
   }
 
@@ -1096,6 +1102,11 @@
   }
 
   async function getDoubanRating(rawTitle, year = '', mediaMeta = null) {
+    const result = await getDoubanRatingWithMeta(rawTitle, year, mediaMeta);
+    return result.data;
+  }
+
+  async function getDoubanRatingWithMeta(rawTitle, year = '', mediaMeta = null) {
     const title = cleanTitle(rawTitle);
     const key = cacheKey(title, year);
     const cached = GM_getValue(key);
@@ -1106,7 +1117,10 @@
         : CONFIG.cacheDays * 24 * 60 * 60 * 1000;
 
       if (Date.now() - cached.ts < ttl) {
-        return cached.data;
+        return {
+          data: cached.data,
+          fromCache: true,
+        };
       }
     }
 
@@ -1123,7 +1137,10 @@
 
         if (data) {
           GM_setValue(key, { ts: Date.now(), data });
-          return data;
+          return {
+            data,
+            fromCache: false,
+          };
         }
       } catch (err) {
         lastError = err;
@@ -1133,7 +1150,10 @@
     const data = fallbackData(title, lastError);
     GM_setValue(key, { ts: Date.now(), data });
 
-    return data;
+    return {
+      data,
+      fromCache: false,
+    };
   }
 
   async function getBiliMediaMeta(url, fallbackTitle = '', fallbackYear = '') {
@@ -1444,12 +1464,14 @@
       const task = queue.shift();
 
       try {
-        await task();
+        const shouldThrottle = await task();
+
+        if (shouldThrottle) {
+          await sleep(CONFIG.requestIntervalMs);
+        }
       } catch (err) {
         console.warn('[Bili Douban Rating]', err);
       }
-
-      await sleep(CONFIG.requestIntervalMs);
     }
 
     queueRunning = false;
